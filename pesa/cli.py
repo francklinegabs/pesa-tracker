@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import sys
 from datetime import date
 
@@ -130,6 +131,27 @@ def cmd_edit(store: Store, args: argparse.Namespace) -> int:
     return 0
 
 
+CSV_FIELDS = ["id", "date", "category", "amount", "note"]
+
+
+def cmd_export(store: Store, args: argparse.Namespace) -> int:
+    rows = sorted(store.expenses, key=lambda e: (e.spent_on, e.id))
+    if args.month:
+        rows = [e for e in rows if (e.spent_on.year, e.spent_on.month) == args.month]
+    out = open(args.output, "w", newline="", encoding="utf-8") if args.output else sys.stdout
+    try:
+        writer = csv.writer(out)
+        writer.writerow(CSV_FIELDS)
+        for e in rows:
+            writer.writerow([e.id, e.spent_on.isoformat(), e.category, f"{e.amount:.2f}", e.note])
+    finally:
+        if out is not sys.stdout:
+            out.close()
+    if args.output:
+        print(f"Exported {len(rows)} expense(s) to {args.output}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pesa", description="Track your spending in KES.")
     parser.add_argument("--file", default=DEFAULT_PATH, help="path to the data file")
@@ -169,6 +191,11 @@ def build_parser() -> argparse.ArgumentParser:
     budget.add_argument("category", nargs="?")
     budget.add_argument("limit", type=float, nargs="?")
     budget.set_defaults(func=cmd_budget)
+
+    export = sub.add_parser("export", help="write expenses as CSV")
+    export.add_argument("-o", "--output", help="file to write (default: print to screen)")
+    export.add_argument("-m", "--month", type=parse_month, help="only this month, YYYY-MM")
+    export.set_defaults(func=cmd_export)
 
     return parser
 
