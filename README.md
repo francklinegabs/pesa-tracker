@@ -16,7 +16,10 @@ Pure Python standard library, no dependencies to install.
 - **Savings goals** with progress and how much to save per month to hit a deadline
 - **Reports**: cash flow over several months, top categories, month-over-month change
 - **Web dashboard**: balances, budget bars, SVG charts, and a transactions page with
-  search, filters, add, edit and delete. Works on phones and in dark mode
+  search, filters, add, edit, delete and an M-Pesa paste box. Works on phones and in dark mode
+- **Runs online and links to M-Pesa**: host it free on PythonAnywhere behind a password,
+  and an SMS-forwarding app on your Android phone sends every M-Pesa message to it.
+  See **[DEPLOY.md](DEPLOY.md)**
 - **CSV export** for Excel or Google Sheets
 - Data lives in a single SQLite file on your machine
 
@@ -134,7 +137,9 @@ python -m pesa serve                  # add --port 9000 or --no-browser if you l
 - **Transactions**: add, edit and delete expenses, income and transfers; search notes and
   filter by type, category, account and date range
 
-The server only listens on `127.0.0.1`, so it is not reachable from other machines.
+By default the server only listens on `127.0.0.1`, so other machines can't reach it.
+Set `PESA_PASSWORD` to require a login, and `PESA_SMS_TOKEN` to turn on the SMS webhook.
+To host it online, see [DEPLOY.md](DEPLOY.md).
 
 ### JSON API
 
@@ -147,8 +152,12 @@ The server only listens on `127.0.0.1`, so it is not reachable from other machin
 | GET / PUT / DELETE | `/api/transactions/<id>` | PUT accepts any subset of the fields |
 | GET | `/api/accounts` | balances |
 | GET | `/api/categories` | used categories plus budgeted ones |
+| POST | `/api/sms/paste` | `{text}`: record pasted M-Pesa messages |
+| POST | `/api/sms?token=…` | webhook for the phone; token auth, takes JSON `{text}`, a form, or plain text |
 
-Errors come back as `{"error": "..."}` with status 400 or 404.
+With a password set, every `/api/*` call except the webhook needs the login cookie.
+POST and PUT bodies must be JSON. Errors come back as `{"error": "..."}` with status
+400, 401, 404 or 415.
 
 ## Where data is stored
 
@@ -166,9 +175,10 @@ pesa/
   mpesa.py     M-Pesa statement CSV import
   sms.py       M-Pesa SMS parsing
   reports.py   cash flow and comparisons
-  web.py       HTTP server and JSON API
-  static/      dashboard page (HTML, CSS, vanilla JS)
-tests/         unittest suite (69 tests)
+  web.py       web app: dashboard, JSON API, login, SMS webhook, local server
+  wsgi.py      entry point for hosting (PythonAnywhere, gunicorn)
+  static/      dashboard and login pages (HTML, CSS, vanilla JS)
+tests/         unittest suite (91 tests)
 ```
 
 ## Running the tests

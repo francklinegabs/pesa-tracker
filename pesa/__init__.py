@@ -1,3 +1,3 @@
-"""pesa-tracker: a small command-line expense tracker in KES."""
+"""pesa-tracker: a personal money tracker in KES with M-Pesa support."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

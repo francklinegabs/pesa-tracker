@@ -39,6 +39,10 @@ async function api(path, options = {}) {
     ...options,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
+  if (res.status === 401) {
+    location.href = "/login";
+    throw new Error("Please log in");
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
@@ -322,6 +326,25 @@ async function removeTx(t) {
   }
 }
 
+async function pasteSms(event) {
+  event.preventDefault();
+  const form = event.target;
+  const status = $("#sms-result");
+  try {
+    const result = await api("/api/sms/paste", { method: "POST", body: { text: form.text.value } });
+    const parts = [`${result.added.length} added`];
+    if (result.skipped.length) parts.push(`${result.skipped.length} already recorded`);
+    if (result.unreadable) parts.push(`${result.unreadable} not recognised`);
+    status.textContent = parts.join(" · ");
+    if (result.added.length) {
+      form.reset();
+      await refresh();
+    }
+  } catch (err) {
+    status.textContent = err.message;
+  }
+}
+
 // ---- wiring ----------------------------------------------------------------
 
 function showView(name) {
@@ -361,6 +384,7 @@ function init() {
   $("#filters").addEventListener("input", onFilterChange);
   const form = $("#tx-form");
   form.addEventListener("submit", saveTx);
+  $("#sms-form").addEventListener("submit", pasteSms);
   form.kind.addEventListener("change", syncKind);
   form.account.addEventListener("change", syncKind);
   $("#cancel-edit").addEventListener("click", () => { resetForm(); loadTransactions(); });

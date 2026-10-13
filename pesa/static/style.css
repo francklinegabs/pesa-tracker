@@ -134,6 +134,19 @@ td.actions { white-space: nowrap; text-align: right; }
 td.actions button { padding: 2px 8px; font-size: 13px; margin-left: 4px; }
 tr.editing td { background: var(--track); }
 
+.logout { color: var(--muted); font-size: 14px; text-decoration: none; }
+.logout:hover { color: var(--text); }
+
+.sms-paste textarea {
+  width: 100%; min-height: 70px; resize: vertical; font: inherit; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px;
+}
+.sms-result { font-size: 14px; color: var(--muted); }
+
+.login-page { display: grid; place-items: center; min-height: 100vh; padding: 16px; }
+.login-card { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 14px; }
+.login-card .form-error { margin: 0; }
+
 @media (max-width: 720px) {
   .cards, .grid { grid-template-columns: 1fr; }
   .month-picker { margin-left: 0; }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -12,7 +13,7 @@ from . import reports
 from .db import ACCOUNT_KINDS, DEFAULT_ACCOUNT, DEFAULT_PATH, Ledger
 from .models import Transaction
 from .mpesa import read_statement
-from .sms import parse_messages
+from .sms import record_messages
 
 
 def parse_date(value: str) -> date:
@@ -293,29 +294,23 @@ def cmd_sms(ledger: Ledger, args: argparse.Namespace) -> int:
         blob = " ".join(args.text)
     else:
         blob = sys.stdin.read()
-    parsed, failed = parse_messages(blob)
-    added = 0
-    for p in parsed:
-        if ledger.has_ref(p.ref):
-            print(f"  skip {p.ref} (already recorded)")
-            continue
-        t = ledger.add(p.amount, p.category, p.note, p.occurred_on, p.kind, args.account, ref=p.ref)
-        print(f"  added {describe(t)} {t.note}")
-        added += 1
-        if p.fee > 0:
-            ledger.add(p.fee, "fees", f"M-Pesa charge for {p.ref}", p.occurred_on,
-                       account=args.account, ref=f"{p.ref}-FEE")
-            print(f"  added fee {fmt_kes(p.fee)}")
-    for message in failed:
-        print(f"  could not read: {message[:60]}...", file=sys.stderr)
-    print(f"\nAdded {added} transaction(s) from {len(parsed) + len(failed)} message(s)")
+    result = record_messages(ledger, blob, args.account)
+    for t in result["added"]:
+        print(f"  added #{t['id']} {t['kind']} {fmt_kes(t['amount'])} {t['category']} "
+              f"({t['occurred_on']}) {t['note']}")
+    for ref in result["skipped"]:
+        print(f"  skip {ref} (already recorded)")
+    if result["unreadable"]:
+        print(f"  {result['unreadable']} message(s) were not M-Pesa confirmations", file=sys.stderr)
+    print(f"\nAdded {len(result['added'])} transaction(s)")
     return 0
 
 
 def cmd_serve(ledger: Ledger, args: argparse.Namespace) -> int:
     from .web import serve
     ledger.close()
-    serve(args.db, args.host, args.port, open_browser=not args.no_browser)
+    serve(args.db, args.host, args.port, open_browser=not args.no_browser,
+          password=os.environ.get("PESA_PASSWORD"), sms_token=os.environ.get("PESA_SMS_TOKEN"))
     return 0
 
 

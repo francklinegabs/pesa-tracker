@@ -14,6 +14,7 @@
       <button class="tab" data-view="transactions" role="tab">Transactions</button>
     </nav>
     <label class="month-picker">Month <input type="month" id="month"></label>
+    <a class="logout" href="/logout">Log out</a>
   </header>
 
   <main>
@@ -73,6 +74,15 @@
           <span class="form-error" id="form-error" role="alert"></span>
         </div>
         <datalist id="category-list"></datalist>
+      </form>
+
+      <form id="sms-form" class="card tx-form sms-paste">
+        <h2>Paste M-Pesa messages</h2>
+        <textarea name="text" placeholder="Paste one or more M-Pesa confirmation SMS here…" required></textarea>
+        <div class="form-actions">
+          <button type="submit" class="primary">Record</button>
+          <span class="sms-result" id="sms-result" role="status"></span>
+        </div>
       </form>
 
       <div class="card">

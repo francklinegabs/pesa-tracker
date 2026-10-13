@@ -91,3 +91,24 @@ def parse_messages(blob: str) -> tuple[list[ParsedSms], list[str]]:
         except ValueError:
             failed.append(message)
     return parsed, failed
+
+
+def record_messages(ledger, blob: str, account: str = "mpesa") -> dict:
+    """Parse `blob` and add each new message (plus its fee) to the ledger.
+
+    Messages already recorded (same receipt) are skipped, so it is safe to send
+    the same SMS twice. Returns what happened, for printing or as an API reply.
+    """
+    parsed, failed = parse_messages(blob)
+    added, skipped = [], []
+    for p in parsed:
+        if ledger.has_ref(p.ref):
+            skipped.append(p.ref)
+            continue
+        t = ledger.add(p.amount, p.category, p.note, p.occurred_on, p.kind, account, ref=p.ref)
+        added.append(t.to_dict())
+        if p.fee > 0:
+            fee = ledger.add(p.fee, "fees", f"M-Pesa charge for {p.ref}", p.occurred_on,
+                             account=account, ref=f"{p.ref}-FEE")
+            added.append(fee.to_dict())
+    return {"added": added, "skipped": skipped, "unreadable": len(failed)}
