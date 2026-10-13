@@ -15,19 +15,19 @@ Small personal expense tracker for the command line, amounts in KES.
 - [x] Tests for summary, budgets, import
 - [x] Polish README with usage examples
 
-## Phase 2 — full money tracker
+## Phase 2 â€” full money tracker
 
-- [ ] Track income as well as expenses (transaction type field + migration of old data)
-- [ ] Accounts / wallets (M-Pesa, bank, cash) with running balances
-- [ ] Transfers between accounts
-- [ ] Move storage to SQLite (stdlib sqlite3) with a schema version table
-- [ ] Recurring transactions (rent, subscriptions) generated automatically
-- [ ] Parse M-Pesa confirmation SMS text into transactions
-- [ ] Savings goals with progress tracking
-- [ ] Reports: monthly cash flow, top categories, month-over-month change
-- [ ] Tests for accounts, transfers, recurring, SMS parsing, reports
+- [x] Track income as well as expenses (transaction type field + migration of old data)
+- [x] Accounts / wallets (M-Pesa, bank, cash) with running balances
+- [x] Transfers between accounts
+- [x] Move storage to SQLite (stdlib sqlite3) with a schema version table
+- [x] Recurring transactions (rent, subscriptions) generated automatically
+- [x] Parse M-Pesa confirmation SMS text into transactions
+- [x] Savings goals with progress tracking
+- [x] Reports: monthly cash flow, top categories, month-over-month change
+- [x] Tests for accounts, transfers, recurring, SMS parsing, reports
 
-## Phase 3 — web dashboard
+## Phase 3 â€” web dashboard
 
 - [ ] Local web server (stdlib http.server) with a JSON API
 - [ ] Dashboard page: balances, this month's spending, budget bars

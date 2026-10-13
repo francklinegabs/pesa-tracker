@@ -45,7 +45,7 @@ class MpesaRow:
 
     @property
     def note(self) -> str:
-        return f"MPESA {self.receipt}: {self.details}"
+        return self.details
 
 
 def guess_category(details: str) -> str:
