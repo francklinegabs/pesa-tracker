@@ -120,6 +120,13 @@ class SignupAndLoginTests(AppCase):
         for path in ("/login", "/signup", "/static/style.css"):
             self.assertEqual(self.call("GET", path)[0], 200, path)
 
+    def test_android_app_download(self):
+        self.assertEqual(self.call("GET", "/app")[0], 404)
+        (self.dir / "pesa-tracker.apk").write_bytes(b"PK fake apk")
+        status, headers, data = self.call("GET", "/app")
+        self.assertEqual((status, data), (200, b"PK fake apk"))
+        self.assertEqual(dict(headers)["Content-Type"], "application/vnd.android.package-archive")
+
     def test_signup_logs_you_in(self):
         response = self.signup()
         self.assertEqual((response[0], dict(response[1])["Location"]), (303, "/"))

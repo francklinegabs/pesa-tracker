@@ -322,6 +322,8 @@ class App:
                 if method != "GET":
                     raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "method not allowed")
                 return _static(path.removeprefix("/static/"))
+            if path in ("/app", "/pesa-tracker.apk") and method == "GET":
+                return self._android_app()
             with UserStore(self.users_path) as users:
                 if path == "/api/sms":
                     return self._sms_webhook(users, method, query, headers, body)
@@ -357,6 +359,17 @@ class App:
             return _json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
         except (ValueError, TypeError) as exc:
             return _json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+
+    def _android_app(self) -> Response:
+        """Serves pesa-tracker.apk from the data folder, so phones can install it over Wi-Fi."""
+        apk = self.data_dir / "pesa-tracker.apk"
+        if not apk.is_file():
+            raise ApiError(HTTPStatus.NOT_FOUND, "the Android app hasn't been put on this server; "
+                                                 "download it from the GitHub releases page instead")
+        return int(HTTPStatus.OK), [
+            ("Content-Type", "application/vnd.android.package-archive"),
+            ("Content-Disposition", 'attachment; filename="pesa-tracker.apk"'),
+        ], apk.read_bytes()
 
     def _login(self, users: UserStore, method: str, body: bytes, secure: bool) -> Response:
         if method == "GET":
