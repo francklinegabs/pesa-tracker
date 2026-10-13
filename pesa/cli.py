@@ -23,7 +23,20 @@ def fmt_kes(amount: float) -> str:
 def cmd_add(store: Store, args: argparse.Namespace) -> int:
     expense = store.add(args.amount, args.category, args.note, args.date)
     print(f"Added #{expense.id}: {fmt_kes(expense.amount)} on {expense.category} ({expense.spent_on})")
+    warn_if_over_budget(store, expense.category, expense.spent_on.year, expense.spent_on.month)
     return 0
+
+
+def warn_if_over_budget(store: Store, category: str, year: int, month: int) -> None:
+    limit = store.budgets.get(category)
+    if limit is None:
+        return
+    spent = store.month_totals(year, month).get(category, 0)
+    if spent > limit:
+        print(f"Warning: {category} is over budget by {fmt_kes(spent - limit)} "
+              f"({fmt_kes(spent)} of {fmt_kes(limit)})")
+    elif spent >= 0.8 * limit:
+        print(f"Heads up: {category} has used {spent / limit:.0%} of its {fmt_kes(limit)} budget")
 
 
 def cmd_list(store: Store, args: argparse.Namespace) -> int:
@@ -55,10 +68,7 @@ def parse_month(value: str) -> tuple[int, int]:
 
 def cmd_summary(store: Store, args: argparse.Namespace) -> int:
     year, month = args.month or (date.today().year, date.today().month)
-    totals: dict[str, float] = {}
-    for e in store.expenses:
-        if (e.spent_on.year, e.spent_on.month) == (year, month):
-            totals[e.category] = totals.get(e.category, 0) + e.amount
+    totals = store.month_totals(year, month)
     if not totals:
         print(f"No expenses in {year}-{month:02d}.")
         return 0
@@ -66,8 +76,39 @@ def cmd_summary(store: Store, args: argparse.Namespace) -> int:
     print(f"Spending for {year}-{month:02d}\n")
     for category, amount in sorted(totals.items(), key=lambda kv: kv[1], reverse=True):
         share = amount / grand * 100
-        print(f"  {category:<14} {fmt_kes(amount):>14}  {share:5.1f}%")
+        line = f"  {category:<14} {fmt_kes(amount):>14}  {share:5.1f}%"
+        limit = store.budgets.get(category)
+        if limit is not None:
+            flag = "  OVER" if amount > limit else ""
+            line += f"   budget {fmt_kes(limit)} ({amount / limit:.0%}){flag}"
+        print(line)
     print(f"\n  {'total':<14} {fmt_kes(grand):>14}")
+    return 0
+
+
+def cmd_budget(store: Store, args: argparse.Namespace) -> int:
+    if args.action == "set":
+        if args.category is None or args.limit is None:
+            raise ValueError("usage: pesa budget set <category> <limit>")
+        store.set_budget(args.category, args.limit)
+        print(f"Budget for {args.category.lower()} set to {fmt_kes(args.limit)} per month")
+    elif args.action == "remove":
+        if args.category is None:
+            raise ValueError("usage: pesa budget remove <category>")
+        store.remove_budget(args.category)
+        print(f"Removed budget for {args.category.lower()}")
+    else:
+        if not store.budgets:
+            print("No budgets set. Try: pesa budget set food 8000")
+            return 0
+        today = date.today()
+        totals = store.month_totals(today.year, today.month)
+        print(f"Budgets for {today.year}-{today.month:02d}\n")
+        for category, limit in sorted(store.budgets.items()):
+            spent = totals.get(category, 0)
+            left = limit - spent
+            print(f"  {category:<14} {fmt_kes(spent):>14} of {fmt_kes(limit):>14}   "
+                  f"{'left ' + fmt_kes(left) if left >= 0 else 'OVER by ' + fmt_kes(-left)}")
     return 0
 
 
@@ -122,6 +163,12 @@ def build_parser() -> argparse.ArgumentParser:
     edit.add_argument("-n", "--note")
     edit.add_argument("-d", "--date", type=parse_date)
     edit.set_defaults(func=cmd_edit)
+
+    budget = sub.add_parser("budget", help="monthly budgets per category")
+    budget.add_argument("action", choices=["list", "set", "remove"], nargs="?", default="list")
+    budget.add_argument("category", nargs="?")
+    budget.add_argument("limit", type=float, nargs="?")
+    budget.set_defaults(func=cmd_budget)
 
     return parser
 
