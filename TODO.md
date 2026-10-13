@@ -3,7 +3,7 @@
 Small personal expense tracker for the command line, amounts in KES.
 
 - [x] Project skeleton: README, .gitignore, package layout
-- [ ] Expense model + JSON storage (add / load / save)
+- [x] Expense model + JSON storage (add / load / save)
 - [ ] `add` command (amount, category, note, date)
 - [ ] `list` command with date filter
 - [ ] Unit tests for storage and model
