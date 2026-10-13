@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+expenses.json
+*.csv
+!tests/fixtures/*.csv
