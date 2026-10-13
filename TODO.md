@@ -12,7 +12,7 @@ Small personal expense tracker for the command line, amounts in KES.
 - [x] Monthly budgets per category + over-budget warnings
 - [x] CSV export
 - [x] Import M-Pesa statement CSV
-- [ ] Tests for summary, budgets, import
+- [x] Tests for summary, budgets, import
 - [ ] Polish README with usage examples
 
 ## Phase 2 — full money tracker
