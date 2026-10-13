@@ -1,0 +1,49 @@
+name: Android app
+
+on:
+  push:
+    branches: [main]
+    paths: ["android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.7"
+
+      - name: Build the APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Rename
+        run: cp app/build/outputs/apk/debug/app-debug.apk pesa-tracker.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pesa-tracker-apk
+          path: android/pesa-tracker.apk
+
+      - name: Publish as the "android-latest" download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-latest --yes --cleanup-tag || true
+          gh release create android-latest pesa-tracker.apk \
+            --target "${{ github.sha }}" \
+            --title "pesa-tracker for Android (latest build)" \
+            --notes "Open this page on your Android phone, tap pesa-tracker.apk to download, then open it to install (allow installing from this source when asked). See ANDROID.md in the repository for setup."
