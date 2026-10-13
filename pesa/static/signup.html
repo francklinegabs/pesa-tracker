@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create account · pesa-tracker</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-page">
+  <form class="card login-card" method="post" action="/signup" id="signup">
+    <div class="brand">pesa<span>-tracker</span></div>
+    <p class="muted intro">Create your account. Your data is private to you.</p>
+    <label>Username
+      <input name="username" autocomplete="username" autocapitalize="none" required autofocus
+             minlength="3" maxlength="32" pattern="[A-Za-z0-9_.\-]{3,32}">
+      <span class="hint">3–32 characters: letters, numbers, . _ or -</span>
+    </label>
+    <label>Password
+      <input type="password" name="password" autocomplete="new-password" required minlength="8">
+      <span class="hint">At least 8 characters</span>
+    </label>
+    <label>Confirm password <input type="password" name="confirm" autocomplete="new-password" required minlength="8"></label>
+    <p class="form-error" id="signup-error" hidden></p>
+    <button type="submit" class="primary">Create account</button>
+    <p class="switch">Already have an account? <a href="/login">Log in</a></p>
+  </form>
+  <script>
+    const box = document.getElementById("signup-error");
+    const error = new URLSearchParams(location.search).get("error");
+    if (error) {
+      box.textContent = error.charAt(0).toUpperCase() + error.slice(1) + ".";
+      box.hidden = false;
+    }
+    document.getElementById("signup").addEventListener("submit", (event) => {
+      const form = event.target;
+      if (form.password.value !== form.confirm.value) {
+        event.preventDefault();
+        box.textContent = "The two passwords don't match.";
+        box.hidden = false;
+      }
+    });
+  </script>
+</body>
+</html>

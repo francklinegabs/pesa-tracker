@@ -1,10 +1,9 @@
 """WSGI entry point for hosting pesa-tracker online (PythonAnywhere, gunicorn, ...).
 
-Set these environment variables (on PythonAnywhere: at the top of the WSGI file):
+Optional environment variables (on PythonAnywhere: set them at the top of the WSGI file):
 
-    PESA_DB         path to the database file, e.g. /home/you/pesa.db
-    PESA_PASSWORD   password for the dashboard (required)
-    PESA_SMS_TOKEN  long random secret your phone sends with each SMS (optional)
+    PESA_DATA_DIR      folder for users.db and everyone's data (default: ~/.pesa)
+    PESA_ALLOW_SIGNUP  set to 0 to stop new people creating accounts
 
 then expose `application`:
 
@@ -20,13 +19,11 @@ from pathlib import Path
 from .web import MAX_BODY, App
 
 
-def make_wsgi_app(db_path: Path | str | None = None, password: str | None = None,
-                  sms_token: str | None = None):
-    password = password or os.environ.get("PESA_PASSWORD")
-    if not password:
-        raise RuntimeError("Set PESA_PASSWORD before hosting pesa-tracker online")
-    db_path = db_path or os.environ.get("PESA_DB") or Path.home() / ".pesa" / "pesa.db"
-    app = App(db_path, password, sms_token or os.environ.get("PESA_SMS_TOKEN"))
+def make_wsgi_app(data_dir: Path | str | None = None, allow_signup: bool | None = None):
+    data_dir = data_dir or os.environ.get("PESA_DATA_DIR") or Path.home() / ".pesa"
+    if allow_signup is None:
+        allow_signup = os.environ.get("PESA_ALLOW_SIGNUP", "1").strip().lower() not in ("0", "false", "no")
+    app = App(data_dir, allow_signup)
 
     def application(environ, start_response):
         try:

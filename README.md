@@ -1,7 +1,7 @@
 # pesa-tracker
 
 A personal money tracker for everyday life in Kenya: amounts in KES, M-Pesa built in.
-Use it from the command line or through a local web dashboard.
+Use it from the command line, or as a multi-user web app where anyone can create an account.
 Pure Python standard library, no dependencies to install.
 
 ## Features
@@ -17,11 +17,13 @@ Pure Python standard library, no dependencies to install.
 - **Reports**: cash flow over several months, top categories, month-over-month change
 - **Web dashboard**: balances, budget bars, SVG charts, and a transactions page with
   search, filters, add, edit, delete and an M-Pesa paste box. Works on phones and in dark mode
-- **Runs online and links to M-Pesa**: host it free on PythonAnywhere behind a password,
-  and an SMS-forwarding app on your Android phone sends every M-Pesa message to it.
-  See **[DEPLOY.md](DEPLOY.md)**
+- **User accounts**: sign up with a username and password. Each user's data is in its own
+  private database, and passwords are stored as salted hashes
+- **Links to M-Pesa**: every user gets a personal link (Settings tab). An SMS-forwarding
+  app on their Android phone sends each M-Pesa message there. Run it on your PC for
+  your Wi-Fi, or host it free on PythonAnywhere for everyone. See **[DEPLOY.md](DEPLOY.md)**
 - **CSV export** for Excel or Google Sheets
-- Data lives in a single SQLite file on your machine
+- Data lives in SQLite files on your machine
 
 ## Requirements
 
@@ -128,18 +130,23 @@ python -m pesa export -o october.csv -m 2026-10
 ## Web dashboard
 
 ```bash
-python -m pesa serve                  # add --port 9000 or --no-browser if you like
+python -m pesa serve                    # just this PC
+python -m pesa serve --host 0.0.0.0     # also phones and laptops on your Wi-Fi
 ```
 
+Options: `--port 9000`, `--no-browser`, `--no-signup` (stop new accounts), and
+`--data-dir` (default `~/.pesa`).
+
+- **Sign up / log in**: anyone who can reach the server can create an account
+  (username + password). Each account sees only its own money
 - **Dashboard**: income, spending and net for the chosen month, account balances,
   budget bars (amber from 80%, red when over), spending by category, six-month cash flow
   and savings goals
 - **Transactions**: add, edit and delete expenses, income and transfers; search notes and
-  filter by type, category, account and date range
+  filter by type, category, account and date range; paste M-Pesa messages
+- **Settings**: your personal M-Pesa SMS link (with setup steps) and changing your password
 
-By default the server only listens on `127.0.0.1`, so other machines can't reach it.
-Set `PESA_PASSWORD` to require a login, and `PESA_SMS_TOKEN` to turn on the SMS webhook.
-To host it online, see [DEPLOY.md](DEPLOY.md).
+To host it online for everyone, see [DEPLOY.md](DEPLOY.md).
 
 ### JSON API
 
@@ -153,17 +160,23 @@ To host it online, see [DEPLOY.md](DEPLOY.md).
 | GET | `/api/accounts` | balances |
 | GET | `/api/categories` | used categories plus budgeted ones |
 | POST | `/api/sms/paste` | `{text}`: record pasted M-Pesa messages |
-| POST | `/api/sms?token=…` | webhook for the phone; token auth, takes JSON `{text}`, a form, or plain text |
+| GET | `/api/me` | username and personal SMS link path |
+| POST | `/api/me/sms-token` | replace the SMS link |
+| POST | `/api/me/password` | `{current, new}` |
+| POST | `/api/sms?token=…` | webhook for the phone; the token picks the user. Takes JSON `{text}`, a form, or plain text |
 
-With a password set, every `/api/*` call except the webhook needs the login cookie.
-POST and PUT bodies must be JSON. Errors come back as `{"error": "..."}` with status
-400, 401, 404 or 415.
+Every `/api/*` call except the webhook needs the login cookie. POST and PUT bodies must
+be JSON. Errors come back as `{"error": "..."}` with status 400, 401, 404 or 415.
+Pages: `/login`, `/signup`, `/logout`.
 
 ## Where data is stored
 
-`~/.pesa/pesa.db` by default. Use `--db path/to/file.db` or the `PESA_DB` environment
-variable to change it. If you used version 0.1 (JSON files), your expenses and budgets
-are moved into the database automatically the first time you run the new version.
+- **Command line:** `~/.pesa/pesa.db` by default. Use `--db path/to/file.db` or the
+  `PESA_DB` environment variable to change it. Version 0.1 JSON files are moved into
+  the database automatically.
+- **Web app:** `~/.pesa/users.db` holds the accounts, `~/.pesa/users/<id>.db` holds each
+  user's money, and `~/.pesa/secret.key` signs logins. The first account created takes
+  over an existing `~/.pesa/pesa.db`, so your command-line data carries over.
 
 ## Project layout
 
@@ -175,10 +188,11 @@ pesa/
   mpesa.py     M-Pesa statement CSV import
   sms.py       M-Pesa SMS parsing
   reports.py   cash flow and comparisons
-  web.py       web app: dashboard, JSON API, login, SMS webhook, local server
+  users.py     user accounts and password hashing
+  web.py       web app: dashboard, JSON API, sign-up/login, SMS webhook, local server
   wsgi.py      entry point for hosting (PythonAnywhere, gunicorn)
-  static/      dashboard and login pages (HTML, CSS, vanilla JS)
-tests/         unittest suite (91 tests)
+  static/      dashboard, login and sign-up pages (HTML, CSS, vanilla JS)
+tests/         unittest suite (105 tests)
 ```
 
 ## Running the tests

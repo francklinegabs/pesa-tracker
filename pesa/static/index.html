@@ -12,8 +12,10 @@
     <nav class="tabs" role="tablist">
       <button class="tab active" data-view="dashboard" role="tab">Dashboard</button>
       <button class="tab" data-view="transactions" role="tab">Transactions</button>
+      <button class="tab" data-view="settings" role="tab">Settings</button>
     </nav>
     <label class="month-picker">Month <input type="month" id="month"></label>
+    <span class="who" id="who"></span>
     <a class="logout" href="/logout">Log out</a>
   </header>
 
@@ -107,6 +109,41 @@
         </div>
         <p class="muted" id="tx-count"></p>
       </div>
+    </section>
+    <section id="view-settings" class="view settings" hidden>
+      <div class="card">
+        <h2>Link your M-Pesa (Android)</h2>
+        <p>Your phone can send every M-Pesa SMS here automatically. This link is personal:
+           anyone who has it can add transactions to your account, so keep it private.</p>
+        <div class="copy-row">
+          <input id="sms-url" readonly aria-label="Your SMS forwarding link">
+          <button type="button" id="copy-sms-url">Copy</button>
+        </div>
+        <ol class="steps">
+          <li>Install <strong>SMS to URL Forwarder</strong> (free, Play Store) or any app that forwards SMS to a URL.</li>
+          <li>Add a rule: sender <strong>MPESA</strong>, method <strong>POST</strong>, URL = the link above. The default JSON template works.</li>
+          <li>In Android settings, set the app's battery usage to <strong>Unrestricted</strong>.</li>
+          <li>Buy KES 10 of airtime to test. It should appear under Transactions within seconds.</li>
+        </ol>
+        <p class="muted" id="sms-note"></p>
+        <div class="form-actions">
+          <button type="button" id="new-sms-token">Make a new link</button>
+          <span class="sms-result" id="token-result" role="status"></span>
+        </div>
+      </div>
+
+      <form class="card" id="password-form" autocomplete="off">
+        <h2>Change password</h2>
+        <div class="fields">
+          <label>Current password <input type="password" name="current" autocomplete="current-password" required></label>
+          <label>New password <input type="password" name="new" autocomplete="new-password" minlength="8" required></label>
+          <label>Repeat new password <input type="password" name="repeat" autocomplete="new-password" minlength="8" required></label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="primary">Change password</button>
+          <span id="password-result" role="status"></span>
+        </div>
+      </form>
     </section>
   </main>
 

@@ -9,13 +9,21 @@
 <body class="login-page">
   <form class="card login-card" method="post" action="/login">
     <div class="brand">pesa<span>-tracker</span></div>
-    <label>Password <input type="password" name="password" autocomplete="current-password" required autofocus></label>
-    <p class="form-error" id="login-error" hidden>Wrong password, try again.</p>
+    <p class="muted intro">Track your money and M-Pesa in one place.</p>
+    <label>Username <input name="username" autocomplete="username" autocapitalize="none" required autofocus></label>
+    <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
+    <p class="form-error" id="login-error" hidden></p>
     <button type="submit" class="primary">Log in</button>
+    <p class="switch">New here? <a href="/signup">Create an account</a></p>
   </form>
   <script>
-    if (new URLSearchParams(location.search).has("error")) {
-      document.getElementById("login-error").hidden = false;
+    const error = new URLSearchParams(location.search).get("error");
+    if (error) {
+      const box = document.getElementById("login-error");
+      box.textContent = error === "closed"
+        ? "Sign-up is closed on this server. Ask the owner for an account."
+        : "Wrong username or password, try again.";
+      box.hidden = false;
     }
   </script>
 </body>

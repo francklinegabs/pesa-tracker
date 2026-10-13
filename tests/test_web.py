@@ -7,16 +7,24 @@ import urllib.request
 from datetime import date
 from pathlib import Path
 
+from http.server import ThreadingHTTPServer
+
 from pesa.db import Ledger
-from pesa.web import make_server
+from pesa.users import UserStore
+from pesa.web import App, make_handler
 
 
 class WebTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
-        cls.db = Path(cls.tmp.name) / "pesa.db"
-        cls.server = make_server(cls.db, port=0)
+        app = App(cls.tmp.name)
+        with UserStore(app.users_path) as users:
+            user = users.create("tester", "correct horse")
+        cls.db = app.ledger_path(user)
+        Ledger(cls.db).close()
+        cls.cookie = app._session_cookie(user, secure=False)[1].split(";")[0]
+        cls.server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(app))
         cls.base = f"http://127.0.0.1:{cls.server.server_address[1]}"
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
@@ -35,7 +43,7 @@ class WebTests(unittest.TestCase):
     def request(self, method, path, body=None, raw=None):
         data = raw if raw is not None else (json.dumps(body).encode() if body is not None else None)
         req = urllib.request.Request(self.base + path, data=data, method=method,
-                                     headers={"Content-Type": "application/json"})
+                                     headers={"Content-Type": "application/json", "Cookie": self.cookie})
         try:
             with urllib.request.urlopen(req) as res:
                 return res.status, res.headers.get("Content-Type"), res.read()

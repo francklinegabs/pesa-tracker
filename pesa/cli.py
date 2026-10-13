@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -306,11 +305,11 @@ def cmd_sms(ledger: Ledger, args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_serve(ledger: Ledger, args: argparse.Namespace) -> int:
+def cmd_serve(args: argparse.Namespace) -> int:
     from .web import serve
-    ledger.close()
-    serve(args.db, args.host, args.port, open_browser=not args.no_browser,
-          password=os.environ.get("PESA_PASSWORD"), sms_token=os.environ.get("PESA_SMS_TOKEN"))
+    data_dir = args.data_dir or Path(args.db).parent
+    serve(data_dir, args.host, args.port, open_browser=not args.no_browser,
+          allow_signup=not args.no_signup)
     return 0
 
 
@@ -444,6 +443,9 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8765)
     serve.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
+    serve.add_argument("--data-dir", help="folder for user accounts and their data "
+                                          "(default: the folder of --db, i.e. ~/.pesa)")
+    serve.add_argument("--no-signup", action="store_true", help="don't let new people create accounts")
     serve.set_defaults(func=cmd_serve)
 
     return parser
@@ -452,13 +454,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if args.command == "serve":
+            return cmd_serve(args)  # the web app opens each user's own database
         ledger = Ledger(args.db)
         if ledger.migrated_from_json:
             print(f"Moved {ledger.migrated_from_json} expense(s) from the old JSON file into {args.db}")
         with ledger:
-            if args.command != "serve":
-                for t in ledger.generate_due():
-                    print(f"Recurring: added {describe(t)}")
+            for t in ledger.generate_due():
+                print(f"Recurring: added {describe(t)}")
             return args.func(ledger, args)
     except (ValueError, LookupError) as exc:
         print(f"error: {exc}", file=sys.stderr)

@@ -347,13 +347,72 @@ async function pasteSms(event) {
 
 // ---- wiring ----------------------------------------------------------------
 
+const VIEWS = ["dashboard", "transactions", "settings"];
+
 function showView(name) {
   for (const tab of document.querySelectorAll(".tab")) {
     tab.classList.toggle("active", tab.dataset.view === name);
   }
-  $("#view-dashboard").hidden = name !== "dashboard";
-  $("#view-transactions").hidden = name !== "transactions";
+  for (const view of VIEWS) $(`#view-${view}`).hidden = view !== name;
   location.hash = name;
+}
+
+// ---- settings --------------------------------------------------------------
+
+function showSmsLink(path) {
+  $("#sms-url").value = location.origin + path;
+  const local = ["127.0.0.1", "localhost", "[::1]"].includes(location.hostname);
+  $("#sms-note").textContent = local
+    ? "This link uses this computer's own address, which your phone can't reach. Open the " +
+      "dashboard from your phone (the Wi-Fi address shown when pesa-tracker starts) to get a link that works there."
+    : "";
+}
+
+async function loadMe() {
+  const me = await api("/api/me");
+  $("#who").textContent = me.username;
+  showSmsLink(me.sms_path);
+}
+
+async function copySmsLink() {
+  const input = $("#sms-url");
+  try {
+    await navigator.clipboard.writeText(input.value);
+  } catch {
+    input.select();
+    document.execCommand("copy");
+  }
+  $("#token-result").textContent = "Copied.";
+}
+
+async function newSmsToken() {
+  if (!confirm("Make a new link? The old one stops working, so you'll need to update your phone.")) return;
+  try {
+    const result = await api("/api/me/sms-token", { method: "POST", body: {} });
+    showSmsLink(result.sms_path);
+    $("#token-result").textContent = "New link ready. Update it in your phone's forwarding app.";
+  } catch (err) {
+    $("#token-result").textContent = err.message;
+  }
+}
+
+async function changePassword(event) {
+  event.preventDefault();
+  const form = event.target;
+  const result = $("#password-result");
+  result.className = "form-error";
+  if (form.new.value !== form.repeat.value) {
+    result.textContent = "The new passwords don't match.";
+    return;
+  }
+  try {
+    await api("/api/me/password", { method: "POST", body: { current: form.current.value, new: form.new.value } });
+    form.reset();
+    result.className = "ok";
+    result.textContent = "Password changed. Other devices will need to log in again.";
+  } catch (err) {
+    result.textContent = err.message;
+  }
 }
 
 async function refresh() {
@@ -389,7 +448,13 @@ function init() {
   form.account.addEventListener("change", syncKind);
   $("#cancel-edit").addEventListener("click", () => { resetForm(); loadTransactions(); });
 
-  showView(location.hash === "#transactions" ? "transactions" : "dashboard");
+  $("#copy-sms-url").addEventListener("click", copySmsLink);
+  $("#new-sms-token").addEventListener("click", newSmsToken);
+  $("#password-form").addEventListener("submit", changePassword);
+
+  const fromHash = location.hash.slice(1);
+  showView(VIEWS.includes(fromHash) ? fromHash : "dashboard");
+  loadMe().catch(showFatal);
   refresh().then(resetForm).catch(showFatal);
 }
 

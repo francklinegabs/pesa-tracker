@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 import re
+import secrets
 import socket
 import time
 import webbrowser
@@ -19,11 +20,12 @@ from http import HTTPStatus
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 
 from . import reports
 from .db import Ledger
 from .sms import record_messages
+from .users import User, UserStore
 
 STATIC_DIR = Path(__file__).parent / "static"
 TX_PATH = re.compile(r"^/api/transactions/(\d+)$")
@@ -234,41 +236,79 @@ def _static(name: str) -> Response:
     return int(HTTPStatus.OK), [("Content-Type", ctype)], target.read_bytes()
 
 
+def _form(body: bytes) -> dict[str, str]:
+    return {k: v[0] for k, v in parse_qs(body.decode("utf-8", errors="replace")).items()}
+
+
 class App:
-    """The whole web app. `password` protects the dashboard; `sms_token` enables the SMS webhook."""
+    """The whole multi-user web app.
 
-    def __init__(self, db_path: Path | str, password: str | None = None,
-                 sms_token: str | None = None) -> None:
-        self.db_path = db_path
-        self.password = password or None
-        self.sms_token = sms_token or None
-        Ledger(db_path).close()  # create / migrate the database before any requests
+    `data_dir` holds `users.db`, a `secret.key` for signing sessions, and one
+    database per user in `users/<id>.db`.
+    """
 
-    # sessions: a signed expiry time in an HttpOnly cookie
+    def __init__(self, data_dir: Path | str, allow_signup: bool = True) -> None:
+        self.data_dir = Path(data_dir)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        (self.data_dir / "users").mkdir(exist_ok=True)
+        self.allow_signup = allow_signup
+        self.secret = self._load_secret()
+        UserStore(self.users_path).close()  # create the user table before any requests
 
-    def _session_value(self, expires: int) -> str:
-        mac = hmac.new(self.password.encode(), f"pesa-session:{expires}".encode(), hashlib.sha256)
-        return f"{expires}.{mac.hexdigest()}"
+    @property
+    def users_path(self) -> Path:
+        return self.data_dir / "users.db"
 
-    def _logged_in(self, cookie_header: str | None) -> bool:
-        if not self.password:
-            return True
-        cookie = SimpleCookie()
-        try:
-            cookie.load(cookie_header or "")
-        except CookieError:
-            return False
-        morsel = cookie.get(SESSION_COOKIE)
-        if morsel is None:
-            return False
-        expires = morsel.value.partition(".")[0]
-        if not expires.isdigit() or int(expires) < time.time():
-            return False
-        return hmac.compare_digest(self._session_value(int(expires)), morsel.value)
+    def ledger_path(self, user: User) -> Path:
+        return self.data_dir / "users" / f"{user.id}.db"
+
+    def _load_secret(self) -> bytes:
+        key_file = self.data_dir / "secret.key"
+        if not key_file.exists():
+            key_file.write_text(secrets.token_hex(32), encoding="ascii")
+        return bytes.fromhex(key_file.read_text(encoding="ascii").strip())
+
+    def _adopt_existing_data(self, user: User) -> None:
+        """The very first account takes over a single-user pesa.db from before accounts existed."""
+        legacy = self.data_dir / "pesa.db"
+        target = self.ledger_path(user)
+        if legacy.exists() and not target.exists():
+            legacy.replace(target)
+
+    # sessions: "<user id>.<expiry>.<signature>" in an HttpOnly cookie. The signature
+    # covers the password hash, so changing the password logs out other devices.
+
+    def _sign(self, user: User, expires: int) -> str:
+        message = f"{user.id}.{expires}.{user.password_hash}".encode()
+        return hmac.new(self.secret, message, hashlib.sha256).hexdigest()
+
+    def _session_cookie(self, user: User, secure: bool) -> tuple[str, str]:
+        expires = int(time.time()) + SESSION_SECONDS
+        return self._cookie(f"{user.id}.{expires}.{self._sign(user, expires)}", SESSION_SECONDS, secure)
 
     def _cookie(self, value: str, max_age: int, secure: bool) -> tuple[str, str]:
         flags = f"Path=/; Max-Age={max_age}; HttpOnly; SameSite=Lax" + ("; Secure" if secure else "")
         return "Set-Cookie", f"{SESSION_COOKIE}={value}; {flags}"
+
+    def _current_user(self, users: UserStore, cookie_header: str | None) -> User | None:
+        cookie = SimpleCookie()
+        try:
+            cookie.load(cookie_header or "")
+        except CookieError:
+            return None
+        morsel = cookie.get(SESSION_COOKIE)
+        if morsel is None:
+            return None
+        parts = morsel.value.split(".")
+        if len(parts) != 3 or not parts[0].isdigit() or not parts[1].isdigit():
+            return None
+        user_id, expires, signature = int(parts[0]), int(parts[1]), parts[2]
+        if expires < time.time():
+            return None
+        user = users.get(user_id)
+        if user is None or not hmac.compare_digest(self._sign(user, expires), signature):
+            return None
+        return user
 
     # entry point
 
@@ -278,33 +318,38 @@ class App:
         try:
             if len(body) > MAX_BODY:
                 raise ApiError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "request body too large")
-            if path == "/api/sms":
-                return self._sms_webhook(method, query, headers, body)
-            if path == "/login":
-                return self._login(method, body, secure)
-            if path == "/logout":
-                return _redirect("/login" if self.password else "/", [self._cookie("", 0, secure)])
             if path.startswith("/static/"):
                 if method != "GET":
                     raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "method not allowed")
                 return _static(path.removeprefix("/static/"))
+            with UserStore(self.users_path) as users:
+                if path == "/api/sms":
+                    return self._sms_webhook(users, method, query, headers, body)
+                if path == "/login":
+                    return self._login(users, method, body, secure)
+                if path == "/signup":
+                    return self._signup(users, method, body, secure)
+                if path == "/logout":
+                    return _redirect("/login", [self._cookie("", 0, secure)])
 
-            logged_in = self._logged_in(headers.get("cookie"))
-            if path.startswith("/api/"):
-                if not logged_in:
-                    raise ApiError(HTTPStatus.UNAUTHORIZED, "please log in")
-                data = None
-                if method in ("POST", "PUT"):
-                    # Requiring JSON means a form on another site can't post here (CSRF).
-                    if "application/json" not in headers.get("content-type", ""):
-                        raise ApiError(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, "send JSON")
-                    data = _json_body(body)
-                with Ledger(self.db_path) as ledger:
-                    status, payload = route(ledger, method, path, parse_qs(query), data)
-                return _json(status, payload)
+                user = self._current_user(users, headers.get("cookie"))
+                if path.startswith("/api/"):
+                    if user is None:
+                        raise ApiError(HTTPStatus.UNAUTHORIZED, "please log in")
+                    data = None
+                    if method in ("POST", "PUT"):
+                        # Requiring JSON means a form on another site can't post here (CSRF).
+                        if "application/json" not in headers.get("content-type", ""):
+                            raise ApiError(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, "send JSON")
+                        data = _json_body(body)
+                    if path.startswith("/api/me"):
+                        return self._me(users, user, method, path, data, secure)
+                    with Ledger(self.ledger_path(user)) as ledger:
+                        status, payload = route(ledger, method, path, parse_qs(query), data)
+                    return _json(status, payload)
 
-            if path in ("/", "/index.html") and method == "GET":
-                return _static("index.html") if logged_in else _redirect("/login")
+                if path in ("/", "/index.html") and method == "GET":
+                    return _static("index.html") if user else _redirect("/login")
             raise ApiError(HTTPStatus.NOT_FOUND, "not found")
         except ApiError as exc:
             return _json(exc.status, {"error": exc.message})
@@ -313,33 +358,65 @@ class App:
         except (ValueError, TypeError) as exc:
             return _json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
 
-    def _login(self, method: str, body: bytes, secure: bool) -> Response:
-        if not self.password:
-            return _redirect("/")
+    def _login(self, users: UserStore, method: str, body: bytes, secure: bool) -> Response:
         if method == "GET":
             return _static("login.html")
         if method != "POST":
             raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "method not allowed")
-        supplied = (parse_qs(body.decode("utf-8", errors="replace")).get("password") or [""])[0]
-        if not hmac.compare_digest(supplied.encode(), self.password.encode()):
+        form = _form(body)
+        user = users.authenticate(form.get("username", ""), form.get("password", ""))
+        if user is None:
             time.sleep(1)  # slow down password guessing
             return _redirect("/login?error=1")
-        expires = int(time.time()) + SESSION_SECONDS
-        return _redirect("/", [self._cookie(self._session_value(expires), SESSION_SECONDS, secure)])
+        return _redirect("/", [self._session_cookie(user, secure)])
 
-    def _sms_webhook(self, method: str, query: str, headers: dict[str, str], body: bytes) -> Response:
-        """Receives M-Pesa SMS from a forwarding app on the phone."""
+    def _signup(self, users: UserStore, method: str, body: bytes, secure: bool) -> Response:
+        if not self.allow_signup:
+            return _redirect("/login?error=closed")
+        if method == "GET":
+            return _static("signup.html")
+        if method != "POST":
+            raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "method not allowed")
+        form = _form(body)
+        if form.get("password", "") != form.get("confirm", ""):
+            return _redirect("/signup?" + urlencode({"error": "the two passwords don't match"}))
+        first_user = users.count() == 0
+        try:
+            user = users.create(form.get("username", ""), form.get("password", ""))
+        except ValueError as exc:
+            return _redirect("/signup?" + urlencode({"error": str(exc)}))
+        if first_user:
+            self._adopt_existing_data(user)
+        Ledger(self.ledger_path(user)).close()
+        return _redirect("/", [self._session_cookie(user, secure)])
+
+    def _me(self, users: UserStore, user: User, method: str, path: str,
+            data: dict | None, secure: bool) -> Response:
+        if path == "/api/me" and method == "GET":
+            return _json(HTTPStatus.OK, {"username": user.username,
+                                         "sms_path": f"/api/sms?token={user.sms_token}"})
+        if path == "/api/me/sms-token" and method == "POST":
+            token = users.new_sms_token(user.id)
+            return _json(HTTPStatus.OK, {"sms_path": f"/api/sms?token={token}"})
+        if path == "/api/me/password" and method == "POST":
+            updated = users.change_password(user.id, str(data.get("current", "")), str(data.get("new", "")))
+            # Fresh cookie for this device; sessions elsewhere stop working.
+            return _json(HTTPStatus.OK, {"ok": True}, [self._session_cookie(updated, secure)])
+        raise ApiError(HTTPStatus.NOT_FOUND, f"no route for {method} {path}")
+
+    def _sms_webhook(self, users: UserStore, method: str, query: str,
+                     headers: dict[str, str], body: bytes) -> Response:
+        """Receives M-Pesa SMS from a forwarding app on a user's phone."""
         if method != "POST":
             raise ApiError(HTTPStatus.METHOD_NOT_ALLOWED, "POST the SMS text here")
-        if not self.sms_token:
-            raise ApiError(HTTPStatus.FORBIDDEN, "SMS webhook is off: set PESA_SMS_TOKEN")
         auth = headers.get("authorization", "")
-        supplied = (_one(parse_qs(query), "token") or headers.get("x-pesa-token")
-                    or (auth[7:] if auth.lower().startswith("bearer ") else ""))
-        if not hmac.compare_digest(supplied.encode(), self.sms_token.encode()):
+        token = (_one(parse_qs(query), "token") or headers.get("x-pesa-token")
+                 or (auth[7:] if auth.lower().startswith("bearer ") else ""))
+        user = users.by_sms_token(token)
+        if user is None:
             raise ApiError(HTTPStatus.UNAUTHORIZED, "wrong or missing token")
         text = sms_text_from_request(headers.get("content-type", ""), body)
-        with Ledger(self.db_path) as ledger:
+        with Ledger(self.ledger_path(user)) as ledger:
             result = record_messages(ledger, text)
         # Always 200 for readable requests, even non-M-Pesa texts, so the phone doesn't keep retrying.
         return _json(HTTPStatus.OK, result)
@@ -377,12 +454,9 @@ def make_handler(app: App):
     return Handler
 
 
-def make_server(db_path: Path | str, host: str = "127.0.0.1", port: int = 8765,
-                password: str | None = None, sms_token: str | None = None) -> ThreadingHTTPServer:
-    if host not in ("127.0.0.1", "localhost", "::1") and not password:
-        raise ValueError("set PESA_PASSWORD before making the dashboard reachable from other devices")
-    app = App(db_path, password, sms_token)
-    return ThreadingHTTPServer((host, port), make_handler(app))
+def make_server(data_dir: Path | str, host: str = "127.0.0.1", port: int = 8765,
+                allow_signup: bool = True) -> ThreadingHTTPServer:
+    return ThreadingHTTPServer((host, port), make_handler(App(data_dir, allow_signup)))
 
 
 def _lan_ip() -> str | None:
@@ -395,18 +469,17 @@ def _lan_ip() -> str | None:
         return None
 
 
-def serve(db_path: Path | str, host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True,
-          password: str | None = None, sms_token: str | None = None) -> None:
-    server = make_server(db_path, host, port, password, sms_token)
+def serve(data_dir: Path | str, host: str = "127.0.0.1", port: int = 8765,
+          open_browser: bool = True, allow_signup: bool = True) -> None:
+    server = make_server(data_dir, host, port, allow_signup)
     port = server.server_address[1]
     local_url = f"http://127.0.0.1:{port}/"
     print(f"pesa dashboard running at {local_url}  (Ctrl+C to stop)")
     if host in ("0.0.0.0", "::"):
         lan_ip = _lan_ip()
         if lan_ip:
-            print(f"From your phone (same Wi-Fi): http://{lan_ip}:{port}/")
-            if sms_token:
-                print(f"SMS webhook: POST http://{lan_ip}:{port}/api/sms?token=<your PESA_SMS_TOKEN>")
+            print(f"Other devices on this Wi-Fi: http://{lan_ip}:{port}/")
+    print("New accounts can sign up." if allow_signup else "Sign-up is closed.")
     if open_browser:
         webbrowser.open(local_url)
     try:
