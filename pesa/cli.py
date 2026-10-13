@@ -44,6 +44,33 @@ def cmd_list(store: Store, args: argparse.Namespace) -> int:
     return 0
 
 
+def parse_month(value: str) -> tuple[int, int]:
+    try:
+        year, month = (int(part) for part in value.split("-"))
+        date(year, month, 1)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid month {value!r}, use YYYY-MM")
+    return year, month
+
+
+def cmd_summary(store: Store, args: argparse.Namespace) -> int:
+    year, month = args.month or (date.today().year, date.today().month)
+    totals: dict[str, float] = {}
+    for e in store.expenses:
+        if (e.spent_on.year, e.spent_on.month) == (year, month):
+            totals[e.category] = totals.get(e.category, 0) + e.amount
+    if not totals:
+        print(f"No expenses in {year}-{month:02d}.")
+        return 0
+    grand = sum(totals.values())
+    print(f"Spending for {year}-{month:02d}\n")
+    for category, amount in sorted(totals.items(), key=lambda kv: kv[1], reverse=True):
+        share = amount / grand * 100
+        print(f"  {category:<14} {fmt_kes(amount):>14}  {share:5.1f}%")
+    print(f"\n  {'total':<14} {fmt_kes(grand):>14}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pesa", description="Track your spending in KES.")
     parser.add_argument("--file", default=DEFAULT_PATH, help="path to the data file")
@@ -61,6 +88,10 @@ def build_parser() -> argparse.ArgumentParser:
     ls.add_argument("--until", type=parse_date, help="up to this date (inclusive)")
     ls.add_argument("-c", "--category")
     ls.set_defaults(func=cmd_list)
+
+    summary = sub.add_parser("summary", help="totals per category for a month")
+    summary.add_argument("-m", "--month", type=parse_month, help="YYYY-MM (default: this month)")
+    summary.set_defaults(func=cmd_summary)
 
     return parser
 
