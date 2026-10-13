@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 import re
+import socket
 import time
 import webbrowser
 from datetime import date
@@ -384,15 +385,30 @@ def make_server(db_path: Path | str, host: str = "127.0.0.1", port: int = 8765,
     return ThreadingHTTPServer((host, port), make_handler(app))
 
 
+def _lan_ip() -> str | None:
+    """This computer's address on the local network (no traffic is actually sent)."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))
+            return s.getsockname()[0]
+    except OSError:
+        return None
+
+
 def serve(db_path: Path | str, host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True,
           password: str | None = None, sms_token: str | None = None) -> None:
     server = make_server(db_path, host, port, password, sms_token)
-    url = f"http://{host}:{server.server_address[1]}/"
-    print(f"pesa dashboard running at {url}  (Ctrl+C to stop)")
-    if sms_token:
-        print(f"SMS webhook: POST {url}api/sms?token=<your PESA_SMS_TOKEN>")
+    port = server.server_address[1]
+    local_url = f"http://127.0.0.1:{port}/"
+    print(f"pesa dashboard running at {local_url}  (Ctrl+C to stop)")
+    if host in ("0.0.0.0", "::"):
+        lan_ip = _lan_ip()
+        if lan_ip:
+            print(f"From your phone (same Wi-Fi): http://{lan_ip}:{port}/")
+            if sms_token:
+                print(f"SMS webhook: POST http://{lan_ip}:{port}/api/sms?token=<your PESA_SMS_TOKEN>")
     if open_browser:
-        webbrowser.open(url)
+        webbrowser.open(local_url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
