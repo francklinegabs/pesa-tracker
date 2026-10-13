@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pesa-tracker</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">pesa<span>-tracker</span></div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="dashboard" role="tab">Dashboard</button>
+      <button class="tab" data-view="transactions" role="tab">Transactions</button>
+    </nav>
+    <label class="month-picker">Month <input type="month" id="month"></label>
+  </header>
+
+  <main>
+    <section id="view-dashboard" class="view">
+      <div class="cards">
+        <div class="card stat"><div class="label">Income</div><div class="value income" id="stat-income">–</div></div>
+        <div class="card stat"><div class="label">Spending</div><div class="value expense" id="stat-expense">–</div></div>
+        <div class="card stat"><div class="label">Net</div><div class="value" id="stat-net">–</div></div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h2>Accounts</h2>
+          <ul class="accounts" id="accounts"></ul>
+        </div>
+        <div class="card">
+          <h2>Budgets</h2>
+          <div id="budgets"></div>
+        </div>
+        <div class="card wide">
+          <h2>Spending by category</h2>
+          <div id="chart-categories" class="chart"></div>
+        </div>
+        <div class="card wide">
+          <h2>Cash flow, last 6 months</h2>
+          <div id="chart-cashflow" class="chart"></div>
+          <div class="legend"><span class="sw income"></span>Income <span class="sw expense"></span>Spending</div>
+        </div>
+        <div class="card wide">
+          <h2>Savings goals</h2>
+          <div id="goals"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-transactions" class="view" hidden>
+      <form id="tx-form" class="card tx-form" autocomplete="off">
+        <h2 id="form-title">Add a transaction</h2>
+        <div class="fields">
+          <label>Type
+            <select name="kind">
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+              <option value="transfer">Transfer</option>
+            </select>
+          </label>
+          <label>Amount (KES) <input name="amount" type="number" step="0.01" min="0.01" required></label>
+          <label class="for-category">Category <input name="category" list="category-list"></label>
+          <label>Account <select name="account" class="account-select"></select></label>
+          <label class="for-transfer" hidden>To account <select name="to_account" class="account-select"></select></label>
+          <label>Date <input name="date" type="date"></label>
+          <label class="note">Note <input name="note" maxlength="200"></label>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="primary" id="save-btn">Add</button>
+          <button type="button" id="cancel-edit" hidden>Cancel</button>
+          <span class="form-error" id="form-error" role="alert"></span>
+        </div>
+        <datalist id="category-list"></datalist>
+      </form>
+
+      <div class="card">
+        <div class="filters" id="filters">
+          <input type="search" name="q" placeholder="Search notes…">
+          <select name="kind">
+            <option value="">All types</option>
+            <option value="expense">Expenses</option>
+            <option value="income">Income</option>
+            <option value="transfer">Transfers</option>
+          </select>
+          <select name="category" id="filter-category"><option value="">All categories</option></select>
+          <select name="account" class="account-filter"><option value="">All accounts</option></select>
+          <label>From <input type="date" name="since"></label>
+          <label>To <input type="date" name="until"></label>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Account</th><th class="num">Amount</th><th>Note</th><th></th></tr></thead>
+            <tbody id="tx-body"></tbody>
+          </table>
+        </div>
+        <p class="muted" id="tx-count"></p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
