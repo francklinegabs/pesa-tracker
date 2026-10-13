@@ -8,7 +8,7 @@ Small personal expense tracker for the command line, amounts in KES.
 - [x] `list` command with date filter
 - [x] Unit tests for storage and model
 - [x] `summary` command: totals per category for a month
-- [ ] `delete` and `edit` by id
+- [x] `delete` and `edit` by id
 - [ ] Monthly budgets per category + over-budget warnings
 - [ ] CSV export
 - [ ] Import M-Pesa statement CSV

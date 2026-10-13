@@ -71,6 +71,24 @@ def cmd_summary(store: Store, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_delete(store: Store, args: argparse.Namespace) -> int:
+    e = store.delete(args.id)
+    print(f"Deleted #{e.id}: {fmt_kes(e.amount)} on {e.category} ({e.spent_on})")
+    return 0
+
+
+def cmd_edit(store: Store, args: argparse.Namespace) -> int:
+    e = store.update(
+        args.id,
+        amount=args.amount,
+        category=args.category,
+        note=args.note,
+        spent_on=args.date,
+    )
+    print(f"Updated #{e.id}: {fmt_kes(e.amount)} on {e.category} ({e.spent_on}) {e.note}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pesa", description="Track your spending in KES.")
     parser.add_argument("--file", default=DEFAULT_PATH, help="path to the data file")
@@ -92,6 +110,18 @@ def build_parser() -> argparse.ArgumentParser:
     summary = sub.add_parser("summary", help="totals per category for a month")
     summary.add_argument("-m", "--month", type=parse_month, help="YYYY-MM (default: this month)")
     summary.set_defaults(func=cmd_summary)
+
+    delete = sub.add_parser("delete", help="remove an expense by id")
+    delete.add_argument("id", type=int)
+    delete.set_defaults(func=cmd_delete)
+
+    edit = sub.add_parser("edit", help="change fields of an expense")
+    edit.add_argument("id", type=int)
+    edit.add_argument("-a", "--amount", type=float)
+    edit.add_argument("-c", "--category")
+    edit.add_argument("-n", "--note")
+    edit.add_argument("-d", "--date", type=parse_date)
+    edit.set_defaults(func=cmd_edit)
 
     return parser
 

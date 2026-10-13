@@ -41,3 +41,26 @@ class Store:
         self.expenses.append(expense)
         self.save()
         return expense
+
+    def get(self, expense_id: int) -> Expense:
+        for e in self.expenses:
+            if e.id == expense_id:
+                return e
+        raise ValueError(f"no expense with id {expense_id}")
+
+    def delete(self, expense_id: int) -> Expense:
+        expense = self.get(expense_id)
+        self.expenses.remove(expense)
+        self.save()
+        return expense
+
+    def update(self, expense_id: int, **changes) -> Expense:
+        current = self.get(expense_id)
+        data = current.to_dict()
+        for key, value in changes.items():
+            if value is not None:
+                data[key] = value.isoformat() if key == "spent_on" else value
+        updated = Expense.from_dict(data)  # re-validates
+        self.expenses[self.expenses.index(current)] = updated
+        self.save()
+        return updated
