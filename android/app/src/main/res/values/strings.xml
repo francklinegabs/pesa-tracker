@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">pesa-tracker</string>
+
+    <string name="setup_title">pesa-tracker</string>
+    <string name="setup_explain">Enter the address of your pesa-tracker. On a home PC it is the \"Other devices on this Wi-Fi\" address shown in the pesa-tracker window, for example http://192.168.0.102:8765.\n\nAfter you log in, M-Pesa messages on this phone are recorded in your account automatically.</string>
+    <string name="server_hint">http://192.168.0.102:8765</string>
+    <string name="connect">Connect</string>
+    <string name="connecting">Connecting…</string>
+    <string name="enter_address">Type the pesa-tracker address first.</string>
+    <string name="cant_reach_address">Couldn\'t find pesa-tracker at %1$s. Check the address, that pesa-tracker is running, and that this phone is on the same Wi-Fi.</string>
+    <string name="cant_reach_saved">Can\'t reach pesa-tracker at %1$s right now. Is it running, and is the phone on the same Wi-Fi? M-Pesa messages are kept and sent later. Tap Connect to try again.</string>
+
+    <string name="linked">M-Pesa linked to %1$s. New M-Pesa messages are recorded automatically.</string>
+    <string name="linked_with_history">M-Pesa linked to %1$s. Sending %2$d M-Pesa messages from the last 90 days.</string>
+    <string name="need_sms_permission">pesa-tracker needs SMS permission to detect M-Pesa messages. Allow it in the app\'s settings.</string>
+    <string name="log_in_first">Log in to pesa-tracker first.</string>
+    <string name="resend_queued">Sending %1$d M-Pesa messages from the last 90 days. Ones already recorded are skipped.</string>
+
+    <string name="menu_status">M-Pesa sync status</string>
+    <string name="menu_resend">Send old M-Pesa messages</string>
+    <string name="menu_battery">Battery settings</string>
+    <string name="menu_server">Change server address</string>
+    <string name="menu_reload">Reload</string>
+    <string name="not_linked">not linked yet (log in)</string>
+    <string name="yes">yes</string>
+    <string name="no">no</string>
+    <string name="status_text">Account: %1$s\nSMS permission: %2$s\nMessages sent: %3$d\nLast: %4$s</string>
+</resources>

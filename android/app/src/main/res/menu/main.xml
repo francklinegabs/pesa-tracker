@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/menu_reload" android:title="@string/menu_reload" />
+    <item android:id="@+id/menu_status" android:title="@string/menu_status" />
+    <item android:id="@+id/menu_resend" android:title="@string/menu_resend" />
+    <item android:id="@+id/menu_battery" android:title="@string/menu_battery" />
+    <item android:id="@+id/menu_server" android:title="@string/menu_server" />
+</menu>

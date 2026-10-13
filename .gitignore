@@ -2,5 +2,10 @@ __pycache__/
 *.pyc
 .venv/
 expenses.json
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
 *.csv
 !tests/fixtures/*.csv
