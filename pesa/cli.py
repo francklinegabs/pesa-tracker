@@ -7,6 +7,7 @@ import csv
 import sys
 from datetime import date
 
+from .mpesa import read_statement
 from .storage import DEFAULT_PATH, Store
 
 
@@ -152,6 +153,21 @@ def cmd_export(store: Store, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_import(store: Store, args: argparse.Namespace) -> int:
+    rows = read_statement(args.statement)
+    seen = {e.note.split(":")[0] for e in store.expenses if e.note.startswith("MPESA ")}
+    new = [r for r in rows if f"MPESA {r.receipt}" not in seen]
+    skipped = len(rows) - len(new)
+    for r in new:
+        print(f"  {r.spent_on}  {r.category:<10} {fmt_kes(r.amount):>14}  {r.details}")
+        if not args.dry_run:
+            store.add(r.amount, r.category, r.note, r.spent_on)
+    verb = "Would import" if args.dry_run else "Imported"
+    print(f"\n{verb} {len(new)} transaction(s), total {fmt_kes(sum(r.amount for r in new))}"
+          + (f"; skipped {skipped} already imported" if skipped else ""))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pesa", description="Track your spending in KES.")
     parser.add_argument("--file", default=DEFAULT_PATH, help="path to the data file")
@@ -196,6 +212,11 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument("-o", "--output", help="file to write (default: print to screen)")
     export.add_argument("-m", "--month", type=parse_month, help="only this month, YYYY-MM")
     export.set_defaults(func=cmd_export)
+
+    imp = sub.add_parser("import", help="import spending from an M-Pesa statement CSV")
+    imp.add_argument("statement", help="path to the statement CSV")
+    imp.add_argument("--dry-run", action="store_true", help="show what would be imported")
+    imp.set_defaults(func=cmd_import)
 
     return parser
 

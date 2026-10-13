@@ -1,0 +1,9 @@
+Receipt No.,Completion Time,Details,Transaction Status,Paid In,Withdrawn,Balance
+SJA1B2C3D4,2026-10-01 08:15:22,Airtime Purchase,Completed,,-100.00,"4,900.00"
+SJA1B2C3D5,2026-10-01 12:40:03,Merchant Payment to 123456 - NAIVAS SUPERMARKET,Completed,,"-1,250.00","3,650.00"
+SJA1B2C3D6,2026-10-02 09:00:11,Pay Bill to 888880 - KPLC PREPAID Acc. 12345678901,Completed,,-500.00,"3,150.00"
+SJA1B2C3D7,2026-10-02 09:00:11,Pay Bill Charge,Completed,,-5.00,"3,145.00"
+SJA1B2C3D8,2026-10-03 18:22:47,Funds received from 0712xxx678 - JOHN DOE,Completed,"2,000.00",,"5,145.00"
+SJA1B2C3D9,2026-10-04 10:05:30,Customer Transfer to 0722xxx111 - JANE DOE,Completed,,-800.00,"4,345.00"
+SJA1B2C3E0,2026-10-04 10:07:12,Customer Transfer to 0722xxx111 - JANE DOE,Failed,,-800.00,"4,345.00"
+SJA1B2C3E1,2026-10-05 16:30:00,Customer Withdrawal At Agent Till 654321,Completed,,"-2,000.00","2,345.00"
