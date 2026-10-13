@@ -26,6 +26,24 @@ def cmd_add(store: Store, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_list(store: Store, args: argparse.Namespace) -> int:
+    rows = [
+        e for e in store.expenses
+        if (args.since is None or e.spent_on >= args.since)
+        and (args.until is None or e.spent_on <= args.until)
+        and (args.category is None or e.category == args.category.lower())
+    ]
+    rows.sort(key=lambda e: (e.spent_on, e.id))
+    if not rows:
+        print("No expenses found.")
+        return 0
+    print(f"{'ID':>4}  {'Date':<10}  {'Category':<14}  {'Amount':>14}  Note")
+    for e in rows:
+        print(f"{e.id:>4}  {e.spent_on}  {e.category:<14}  {fmt_kes(e.amount):>14}  {e.note}")
+    print(f"\n{len(rows)} expense(s), total {fmt_kes(sum(e.amount for e in rows))}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pesa", description="Track your spending in KES.")
     parser.add_argument("--file", default=DEFAULT_PATH, help="path to the data file")
@@ -37,6 +55,12 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("-n", "--note", default="")
     add.add_argument("-d", "--date", type=parse_date, default=None, help="YYYY-MM-DD (default: today)")
     add.set_defaults(func=cmd_add)
+
+    ls = sub.add_parser("list", help="show expenses")
+    ls.add_argument("--since", type=parse_date, help="from this date (inclusive)")
+    ls.add_argument("--until", type=parse_date, help="up to this date (inclusive)")
+    ls.add_argument("-c", "--category")
+    ls.set_defaults(func=cmd_list)
 
     return parser
 

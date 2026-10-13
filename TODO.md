@@ -5,7 +5,7 @@ Small personal expense tracker for the command line, amounts in KES.
 - [x] Project skeleton: README, .gitignore, package layout
 - [x] Expense model + JSON storage (add / load / save)
 - [x] `add` command (amount, category, note, date)
-- [ ] `list` command with date filter
+- [x] `list` command with date filter
 - [ ] Unit tests for storage and model
 - [ ] `summary` command: totals per category for a month
 - [ ] `delete` and `edit` by id
